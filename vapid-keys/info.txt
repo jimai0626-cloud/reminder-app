@@ -1,0 +1,12 @@
+この2つのファイルは、あなた専用に今回生成したVAPID鍵ペアです。
+「これは自分のアプリからの通知です」と証明するための合鍵で、他の誰かと共有するものではありません。
+
+Application Server Key（フロント側/Vercelで使う・公開して問題ない値）:
+BNyC6LX5zOnYSrxpq6sBjrMKVS7wwGvvbIOTPvyg_2oaQV0IHoB4zUxnm0wShLVqeC5n2yS32Sv6UR6kC5mPt1M
+
+使い道:
+- public_key.pem  → 今回は直接使わない（Application Server Keyの元データ。念のため保管）
+- private_key.pem → GitHubのSecretsに「VAPID_PRIVATE_KEY_PEM」という名前でファイルの中身をそのまま貼り付ける
+- 上のApplication Server Key文字列 → Vercelの環境変数「VITE_VAPID_PUBLIC_KEY」に貼り付ける
+
+詳しい手順はREADME.mdを見てください。
