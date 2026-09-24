@@ -1,0 +1,40 @@
+name: send-reminder
+
+on:
+  schedule:
+    # GitHub Actionsの最短間隔は5分。混雑を避けるため0分・5分ちょうどを避けて動かす。
+    - cron: "3,8,13,18,23,28,33,38,43,48,53,58 * * * *"
+  workflow_dispatch: {} # GitHubの「Actions」タブから手動テスト実行できるようにする
+
+permissions:
+  contents: write # 実行ログをリポジトリにコミットして push するために必要
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r bot/requirements.txt
+
+      - name: Send due reminders
+        env:
+          PUSH_SUBSCRIPTION: ${{ secrets.PUSH_SUBSCRIPTION }}
+          VAPID_PRIVATE_KEY_PEM: ${{ secrets.VAPID_PRIVATE_KEY_PEM }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
+        run: python bot/send_reminder.py
+
+      # bot/last-run.json を毎回コミットすることで「60日間動きが無いと
+      # 自動停止する」というGitHubの仕様に引っかからないようにしている。
+      - name: Commit run log (keeps the schedule alive)
+        run: |
+          git config user.name "reminder-bot"
+          git config user.email "reminder-bot@users.noreply.github.com"
+          git add bot/last-run.json
+          git diff --cached --quiet || git commit -m "chore: log run $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push
