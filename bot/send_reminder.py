@@ -2,14 +2,25 @@
 GitHub Actionsが数分おきに実行するスクリプト。
 「今このルールは送るべきか」を判定し、該当するものだけpush通知を送る。
 
-曜日の数字は 0=日曜, 1=月曜, ... 6=土曜（rules.jsonでもこの数字を使う）。
+ルールの条件は3種類あり、上から優先的に判定される:
 
-rotationGroup を使うと「2週間おきの当番」のような周期的な条件も表現できる:
-  "rotationGroup": {
-    "anchorDate": "2026-09-01",  # この日を周期0番目とする基準日
-    "groupSize": 2,               # 周期の長さ（例: 2週間ローテーションなら2）
-    "activeIndex": 0              # 何番目の周期で有効か
-  }
+1. dates（毎月バラバラなシフトなど、特定の日付だけ鳴らしたい場合）
+   "dates": ["2026-10-03", "2026-10-07", "2026-10-15"]
+   このリストに今日の日付が入っている日だけ有効。指定した場合、
+   activeWeekdays / rotationGroup は無視される。
+
+2. activeWeekdays（毎週決まった曜日に鳴らしたい場合）
+   0=日曜, 1=月曜, ... 6=土曜
+   "activeWeekdays": [1, 2, 3, 4, 5]
+
+3. rotationGroup（2週間おきの当番のような、周期的な条件の場合）
+   "rotationGroup": {
+     "anchorDate": "2026-09-01",  # この日を周期0番目とする基準日
+     "groupSize": 2,               # 周期の長さ（例: 2週間ローテーションなら2）
+     "activeIndex": 0              # 何番目の周期で有効か
+   }
+
+何も指定しなければ「毎日」有効。
 """
 
 import json
@@ -32,6 +43,12 @@ def to_js_weekday(d: date) -> int:
 
 def is_reminder_active_today(rule: dict, now: datetime) -> bool:
     today = now.date()
+
+    # 毎月バラバラなシフトのような、日付を直接指定するタイプ。
+    # これが指定されている場合は、曜日・周期の判定はスキップする。
+    dates = rule.get("dates")
+    if dates is not None:
+        return today.isoformat() in dates
 
     active_weekdays = rule.get("activeWeekdays")
     if active_weekdays is not None and to_js_weekday(today) not in active_weekdays:
