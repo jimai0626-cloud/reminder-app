@@ -11,10 +11,11 @@ export function isRunningAsInstalledApp() {
 }
 
 function urlBase64ToUint8Array(base64String) {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding)
-    .replace(/-/g, "+")
-    .replace(/_/g, "/");
+  // コピペ時に紛れ込みがちな改行・空白・全角文字などを先に取り除く。
+  // base64url で使われる文字（英数字・- ・ _）だけを残す。
+  const cleaned = base64String.trim().replace(/[^A-Za-z0-9\-_]/g, "");
+  const padding = "=".repeat((4 - (cleaned.length % 4)) % 4);
+  const base64 = (cleaned + padding).replace(/-/g, "+").replace(/_/g, "/");
   const rawData = atob(base64);
   return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
 }
