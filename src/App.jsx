@@ -464,7 +464,7 @@ button { cursor: pointer; }
 .login-lead { color: var(--soft); margin: 0; }
 .login .field { max-width: 280px; text-align: center; }
 
-.app { max-width: 560px; margin: 0 auto; padding: 0 14px calc(96px + env(safe-area-inset-bottom, 0px)); }
+.app { max-width: 560px; overflow-x: hidden; margin: 0 auto; padding: 0 14px calc(96px + env(safe-area-inset-bottom, 0px)); }
 .top { display: flex; align-items: center; gap: 8px; padding: 12px 0; }
 .top-icon { width: 34px; height: 34px; border-radius: 10px; }
 .tabs { margin-left: auto; display: flex; background: #F6E6E1; border-radius: 999px; padding: 3px; }
@@ -475,10 +475,10 @@ button { cursor: pointer; }
 .month h2 { font-size: 22px; font-weight: 900; margin: 0; }
 .round { width: 38px; height: 38px; border-radius: 50%; border: 1.5px solid var(--line); background: var(--card); font-size: 20px; line-height: 1; }
 
-.grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
 .wk { text-align: center; font-size: 12px; color: var(--soft); padding-bottom: 2px; }
 .wk.sun { color: #D06A7F; } .wk.sat { color: #5E8FC4; }
-.day { position: relative; aspect-ratio: 1 / 1.15; border: 0; border-radius: 12px; background: var(--card); padding: 4px 3px; display: flex; flex-direction: column; align-items: center; gap: 2px; box-shadow: inset 0 0 0 1px var(--line); }
+.day { position: relative; min-width: 0; min-height: 66px; overflow: hidden; border: 0; border-radius: 12px; background: var(--card); padding: 4px 3px; display: flex; flex-direction: column; align-items: center; gap: 2px; box-shadow: inset 0 0 0 1px var(--line); }
 .day.today { box-shadow: inset 0 0 0 2.5px var(--rose); }
 .day.past { opacity: .45; }
 .num { font-size: 13px; font-weight: 700; }
@@ -528,5 +528,12 @@ button { cursor: pointer; }
 .item { display: flex; flex-direction: column; gap: 6px; padding: 12px 0; border-bottom: 1px dashed var(--line); }
 .set-foot { display: flex; justify-content: space-between; margin-top: 6px; }
 
+@media (max-width: 440px) {
+  .grid { gap: 3px; }
+  .day { min-height: 58px; border-radius: 10px; padding: 3px 1px; }
+  .dot { min-width: 16px; height: 16px; padding: 0 2px; font-size: 10px; }
+  .brand.small { font-size: 16px; }
+  .tabs button { padding: 6px 11px; font-size: 13px; }
+}
 @media (prefers-reduced-motion: reduce) { .sticker { transition: none; } }
 `;
