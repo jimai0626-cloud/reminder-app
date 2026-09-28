@@ -1,12 +1,28 @@
 [
   {
-    "id": "test-line-2",
-    "label": "テスト通知",
-    "time": "13:06",
-    "dates": ["2026-09-28"],
+    "id": "set-n4fg0x-0",
+    "label": "本館：AM・PM 10:05",
+    "time": "10:05",
+    "dates": [
+      "2026-09-29",
+      "2026-09-30"
+    ],
     "message": {
-      "title": "テスト通知",
-      "body": "LINE経由で届けばOKです"
+      "title": "本館：AM",
+      "body": ""
+    }
+  },
+  {
+    "id": "set-n4fg0x-1",
+    "label": "本館：AM・PM 13:20",
+    "time": "13:20",
+    "dates": [
+      "2026-09-29",
+      "2026-09-30"
+    ],
+    "message": {
+      "title": "本館：PM",
+      "body": ""
     }
   }
 ]
