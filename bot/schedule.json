@@ -2,29 +2,24 @@
   "sets": [
     {
       "id": "n4fg0x",
-      "name": "本館：AM・PM",
+      "name": "本館：AM",
       "color": "#86BDEB",
       "items": [
         {
           "time": "10:05",
           "title": "本館：AM",
           "body": ""
-        },
-        {
-          "time": "13:20",
-          "title": "本館：PM",
-          "body": ""
         }
       ]
     },
     {
       "id": "li3mux",
-      "name": "ネパール→13:50",
+      "name": "エリア案内→13:50",
       "color": "#F5A97F",
       "items": [
         {
           "time": "13:50",
-          "title": "ネパール→13:50",
+          "title": "エリア案内→13:50",
           "body": ""
         }
       ]
@@ -38,6 +33,18 @@
           "time": "11:30",
           "title": "人員計算出",
           "body": "集計範囲、団体注意"
+        }
+      ]
+    },
+    {
+      "id": "xmvig3",
+      "name": "本館:PM",
+      "color": "#B7A3E3",
+      "items": [
+        {
+          "time": "13:50",
+          "title": "本館:PM",
+          "body": ""
         }
       ]
     }
