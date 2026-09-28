@@ -1,13 +1,16 @@
 name: send-reminder
 
+# cron-job.org が数分おきにこのワークフローを起動する（GitHub自身の定期実行は使わない）。
 on:
-  schedule:
-    # GitHub Actionsの最短間隔は5分。混雑を避けるため0分・5分ちょうどを避けて動かす。
-    - cron: "3,8,13,18,23,28,33,38,43,48,53,58 * * * *"
-  workflow_dispatch: {} # GitHubの「Actions」タブから手動テスト実行できるようにする
+  workflow_dispatch: {}
+
+# 同時に2つ動いて二重送信しないよう、1つずつ順番に実行する。
+concurrency:
+  group: send-reminder
+  cancel-in-progress: false
 
 permissions:
-  contents: write # 実行ログをリポジトリにコミットして push するために必要
+  contents: write # 送信済みの記録(bot/sent.json)をコミットするために必要
 
 jobs:
   send:
@@ -15,26 +18,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install dependencies
-        run: pip install -r bot/requirements.txt
-
       - name: Send due reminders
         env:
-          PUSH_SUBSCRIPTION: ${{ secrets.PUSH_SUBSCRIPTION }}
-          VAPID_PRIVATE_KEY_PEM: ${{ secrets.VAPID_PRIVATE_KEY_PEM }}
-          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
-        run: python bot/send_reminder.py
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: python3 bot/send_reminder.py
 
-      # bot/last-run.json を毎回コミットすることで「60日間動きが無いと
-      # 自動停止する」というGitHubの仕様に引っかからないようにしている。
-      - name: Commit run log (keeps the schedule alive)
+      # 送信済みの記録が増えたときだけコミットする。
+      # メッセージの [skip ci] は、Vercelが無駄に再デプロイしないための目印。
+      - name: Save sent log
         run: |
           git config user.name "reminder-bot"
           git config user.email "reminder-bot@users.noreply.github.com"
-          git add bot/last-run.json
-          git diff --cached --quiet || git commit -m "chore: log run $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          git push
+          git add bot/sent.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: update sent log [skip ci]"
+            git pull --rebase
+            git push
+          fi
