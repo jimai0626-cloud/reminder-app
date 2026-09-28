@@ -1,6 +1,7 @@
 """
-GitHub Actionsが数分おきに実行するスクリプト。
-「今このルールは送るべきか」を判定し、該当するものだけpush通知を送る。
+cron-job.org が数分おきに GitHub Actions を起動し、このスクリプトが実行される。
+「今このルールは送るべきか」を判定し、該当するものだけ ntfy 経由でiPhoneに通知する。
+(iPhoneの ntfy アプリが受け取り → Fitbit が転送して腕が震える)
 
 ルールの条件は3種類あり、上から優先的に判定される:
 
@@ -21,19 +22,27 @@ GitHub Actionsが数分おきに実行するスクリプト。
    }
 
 何も指定しなければ「毎日」有効。
+
+同じ通知が何度も鳴らないよう、送信済みの記録を bot/sent.json に残す。
 """
 
 import json
 import os
+import urllib.request
 from datetime import date, datetime, timedelta, timezone
-
-from pywebpush import WebPushException, webpush
 
 JST = timezone(timedelta(hours=9))
 BOT_DIR = os.path.dirname(os.path.abspath(__file__))
 RULES_PATH = os.path.join(BOT_DIR, "rules.json")
 LAST_RUN_PATH = os.path.join(BOT_DIR, "last-run.json")
-PRIVATE_KEY_PATH = os.path.join(BOT_DIR, "vapid_private_key.pem")
+SENT_PATH = os.path.join(BOT_DIR, "sent.json")
+
+NTFY_URL = "https://ntfy.sh"
+
+# 指定時刻の何分前から何分後までを「送る対象」にするか。
+# 起動役の実行が多少ずれても取りこぼさないよう、後ろ側を広めにとっている。
+MINUTES_BEFORE = 2
+MINUTES_AFTER = 10
 
 
 def to_js_weekday(d: date) -> int:
@@ -44,8 +53,6 @@ def to_js_weekday(d: date) -> int:
 def is_reminder_active_today(rule: dict, now: datetime) -> bool:
     today = now.date()
 
-    # 毎月バラバラなシフトのような、日付を直接指定するタイプ。
-    # これが指定されている場合は、曜日・周期の判定はスキップする。
     dates = rule.get("dates")
     if dates is not None:
         return today.isoformat() in dates
@@ -65,19 +72,23 @@ def is_reminder_active_today(rule: dict, now: datetime) -> bool:
     return True
 
 
-def is_within_fire_window(rule: dict, now: datetime, window_minutes: int = 5) -> bool:
+def is_within_fire_window(rule: dict, now: datetime) -> bool:
     hour, minute = (int(x) for x in rule["time"].split(":"))
     target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-    return abs((now - target).total_seconds()) <= window_minutes * 60
+    delta = (now - target).total_seconds()
+    return -MINUTES_BEFORE * 60 <= delta <= MINUTES_AFTER * 60
 
 
-def get_due_reminders(rules: list, now: datetime, window_minutes: int = 5) -> list:
+def get_due_reminders(rules: list, now: datetime) -> list:
     return [
         rule
         for rule in rules
-        if is_reminder_active_today(rule, now)
-        and is_within_fire_window(rule, now, window_minutes)
+        if is_reminder_active_today(rule, now) and is_within_fire_window(rule, now)
     ]
+
+
+def sent_key(rule: dict, now: datetime) -> str:
+    return f"{rule['id']}|{now.date().isoformat()}|{rule['time']}"
 
 
 def load_rules() -> list:
@@ -85,72 +96,82 @@ def load_rules() -> list:
         return json.load(f)
 
 
-def write_private_key_file() -> str:
-    """GitHub Secretsに入れたPEM文字列を、pywebpushが読めるファイルとして書き出す。"""
-    pem = os.environ["VAPID_PRIVATE_KEY_PEM"]
-    with open(PRIVATE_KEY_PATH, "w", encoding="utf-8") as f:
-        f.write(pem)
-    return PRIVATE_KEY_PATH
+def load_sent(now: datetime) -> list:
+    """送信済みの記録を読み込む。3日より古いものは捨てる。"""
+    try:
+        with open(SENT_PATH, encoding="utf-8") as f:
+            keys = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+    limit = (now.date() - timedelta(days=3)).isoformat()
+    return [k for k in keys if k.split("|")[1] >= limit]
 
 
-def send_reminder(subscription_info: dict, rule: dict, private_key_path: str) -> None:
+def save_sent(keys: list) -> None:
+    with open(SENT_PATH, "w", encoding="utf-8") as f:
+        json.dump(keys, f, ensure_ascii=False, indent=2)
+
+
+def send_ntfy(topic: str, rule: dict) -> None:
     payload = json.dumps(
         {
+            "topic": topic,
             "title": rule["message"]["title"],
-            "body": rule["message"]["body"],
-            "tag": rule["id"],
+            "message": rule["message"]["body"],
         }
-    )
-    vapid_subject = os.environ.get("VAPID_SUBJECT", "mailto:example@example.com")
-
-    webpush(
-        subscription_info=subscription_info,
+    ).encode("utf-8")
+    request = urllib.request.Request(
+        NTFY_URL,
         data=payload,
-        vapid_private_key=private_key_path,
-        vapid_claims={"sub": vapid_subject},
+        headers={"Content-Type": "application/json"},
+        method="POST",
     )
+    with urllib.request.urlopen(request, timeout=20) as response:
+        response.read()
+
+
+def write_last_run(result: dict) -> None:
+    with open(LAST_RUN_PATH, "w", encoding="utf-8") as f:
+        json.dump(result, f, ensure_ascii=False, indent=2)
 
 
 def main() -> None:
-    subscription_raw = os.environ.get("PUSH_SUBSCRIPTION")
+    topic = os.environ.get("NTFY_TOPIC", "").strip()
     now = datetime.now(JST)
     rules = load_rules()
+    sent = load_sent(now)
 
     result = {
         "checked_at": now.isoformat(),
         "checked_rules": len(rules),
         "sent": 0,
+        "skipped_already_sent": 0,
         "failed": 0,
         "note": "",
     }
 
-    if not subscription_raw:
-        result["note"] = "PUSH_SUBSCRIPTION が未設定（まだ購読していない）"
+    if not topic:
+        result["note"] = "NTFY_TOPIC が未設定です（GitHubのSecretsを確認してください）"
         write_last_run(result)
-        print(result["note"])
+        print(json.dumps(result, ensure_ascii=False))
         return
 
-    subscription_info = json.loads(subscription_raw)
-    due = get_due_reminders(rules, now, window_minutes=5)
-    private_key_path = write_private_key_file()
-
-    for rule in due:
+    for rule in get_due_reminders(rules, now):
+        key = sent_key(rule, now)
+        if key in sent:
+            result["skipped_already_sent"] += 1
+            continue
         try:
-            send_reminder(subscription_info, rule, private_key_path)
+            send_ntfy(topic, rule)
+            sent.append(key)
             result["sent"] += 1
-        except WebPushException as exc:
+        except Exception as exc:  # 送信に失敗しても、他のルールの処理は続ける
             result["failed"] += 1
             print(f"送信失敗: {rule.get('id')}: {exc}")
 
+    save_sent(sent)
     write_last_run(result)
     print(json.dumps(result, ensure_ascii=False))
-
-
-def write_last_run(result: dict) -> None:
-    # 実行のたびにこのファイルを更新してリポジトリにコミットすることで、
-    # GitHubの「60日間動きが無いと自動停止する」仕様に引っかからないようにしている。
-    with open(LAST_RUN_PATH, "w", encoding="utf-8") as f:
-        json.dump(result, f, ensure_ascii=False, indent=2)
 
 
 if __name__ == "__main__":
