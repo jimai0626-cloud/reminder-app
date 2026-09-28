@@ -1,7 +1,7 @@
 """
 cron-job.org が数分おきに GitHub Actions を起動し、このスクリプトが実行される。
-「今このルールは送るべきか」を判定し、該当するものだけ ntfy 経由でiPhoneに通知する。
-(iPhoneの ntfy アプリが受け取り → Fitbit が転送して腕が震える)
+「今このルールは送るべきか」を判定し、該当するものだけ LINE で自分に通知する。
+(自分専用のLINE公式アカウント → iPhoneのLINE → Fitbit が転送して腕が震える)
 
 ルールの条件は3種類あり、上から優先的に判定される:
 
@@ -28,6 +28,7 @@ cron-job.org が数分おきに GitHub Actions を起動し、このスクリプ
 
 import json
 import os
+import urllib.error
 import urllib.request
 from datetime import date, datetime, timedelta, timezone
 
@@ -37,7 +38,7 @@ RULES_PATH = os.path.join(BOT_DIR, "rules.json")
 LAST_RUN_PATH = os.path.join(BOT_DIR, "last-run.json")
 SENT_PATH = os.path.join(BOT_DIR, "sent.json")
 
-NTFY_URL = "https://ntfy.sh"
+LINE_PUSH_URL = "https://api.line.me/v2/bot/message/push"
 
 # 指定時刻の何分前から何分後までを「送る対象」にするか。
 # 起動役の実行が多少ずれても取りこぼさないよう、後ろ側を広めにとっている。
@@ -112,22 +113,31 @@ def save_sent(keys: list) -> None:
         json.dump(keys, f, ensure_ascii=False, indent=2)
 
 
-def send_ntfy(topic: str, rule: dict) -> None:
+def send_line(token: str, user_id: str, rule: dict) -> None:
+    """LINEのMessaging APIで、自分(user_id)にメッセージを1通送る。"""
+    title = rule["message"]["title"]
+    body = rule["message"].get("body", "")
+    text = f"{title}\n{body}" if body else title
     payload = json.dumps(
-        {
-            "topic": topic,
-            "title": rule["message"]["title"],
-            "message": rule["message"]["body"],
-        }
+        {"to": user_id, "messages": [{"type": "text", "text": text}]},
+        ensure_ascii=False,
     ).encode("utf-8")
     request = urllib.request.Request(
-        NTFY_URL,
+        LINE_PUSH_URL,
         data=payload,
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        },
         method="POST",
     )
-    with urllib.request.urlopen(request, timeout=20) as response:
-        response.read()
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            response.read()
+    except urllib.error.HTTPError as exc:
+        # LINEが返してきた理由(合言葉が違う、友だちでない等)をログに出す
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"HTTP {exc.code}: {detail}") from exc
 
 
 def write_last_run(result: dict) -> None:
@@ -136,7 +146,8 @@ def write_last_run(result: dict) -> None:
 
 
 def main() -> None:
-    topic = os.environ.get("NTFY_TOPIC", "").strip()
+    token = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN", "").strip()
+    user_id = os.environ.get("LINE_USER_ID", "").strip()
     now = datetime.now(JST)
     rules = load_rules()
     sent = load_sent(now)
@@ -150,8 +161,8 @@ def main() -> None:
         "note": "",
     }
 
-    if not topic:
-        result["note"] = "NTFY_TOPIC が未設定です（GitHubのSecretsを確認してください）"
+    if not token or not user_id:
+        result["note"] = "LINE_CHANNEL_ACCESS_TOKEN または LINE_USER_ID が未設定です（GitHubのSecretsを確認してください）"
         write_last_run(result)
         print(json.dumps(result, ensure_ascii=False))
         return
@@ -162,7 +173,7 @@ def main() -> None:
             result["skipped_already_sent"] += 1
             continue
         try:
-            send_ntfy(topic, rule)
+            send_line(token, user_id, rule)
             sent.append(key)
             result["sent"] += 1
         except Exception as exc:  # 送信に失敗しても、他のルールの処理は続ける
