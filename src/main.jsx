@@ -1,18 +1,10 @@
 import React from "react";
-import ReactDOM from "react-dom/client";
+import { createRoot } from "react-dom/client";
 import App from "./App.jsx";
 
-// service worker を登録（iOSはホーム画面追加後のスタンドアロン起動でのみpushが有効）
+// 以前の通知用の仕組み(サービスワーカー)が残っていたら外す
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/service-worker.js").catch((err) => {
-      console.error("Service worker registration failed:", err);
-    });
-  });
+  navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((r) => r.unregister()));
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+createRoot(document.getElementById("root")).render(<App />);
