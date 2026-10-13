@@ -111,5 +111,77 @@
       "title": "CC金額&色・バス🎫など",
       "body": ""
     }
+  },
+  {
+    "id": "set-pxicvl-0",
+    "label": "イベント音楽 11:00",
+    "time": "11:00",
+    "dates": [
+      "2026-10-25"
+    ],
+    "message": {
+      "title": "イベント音楽",
+      "body": ""
+    }
+  },
+  {
+    "id": "set-pxicvl-1",
+    "label": "イベント音楽 11:20",
+    "time": "11:20",
+    "dates": [
+      "2026-10-25"
+    ],
+    "message": {
+      "title": "イベント音楽",
+      "body": ""
+    }
+  },
+  {
+    "id": "set-pxicvl-2",
+    "label": "イベント音楽 12:00",
+    "time": "12:00",
+    "dates": [
+      "2026-10-25"
+    ],
+    "message": {
+      "title": "イベント音楽",
+      "body": ""
+    }
+  },
+  {
+    "id": "set-pxicvl-3",
+    "label": "イベント音楽 12:20",
+    "time": "12:20",
+    "dates": [
+      "2026-10-25"
+    ],
+    "message": {
+      "title": "イベント音楽",
+      "body": ""
+    }
+  },
+  {
+    "id": "set-pxicvl-4",
+    "label": "イベント音楽 13:00",
+    "time": "13:00",
+    "dates": [
+      "2026-10-25"
+    ],
+    "message": {
+      "title": "イベント音楽",
+      "body": ""
+    }
+  },
+  {
+    "id": "set-pxicvl-5",
+    "label": "イベント音楽 13:20",
+    "time": "13:20",
+    "dates": [
+      "2026-10-25"
+    ],
+    "message": {
+      "title": "イベント音楽",
+      "body": ""
+    }
   }
 ]
